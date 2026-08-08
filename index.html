@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - HTML</title>
+
+    <!-- External CSS (you will build this later) -->
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="saveAs()">Save</button>
+            <button class="navbtn" onclick="openFile()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<!-- ⭐ Split container -->
+<div id="split-container" style="display:flex; height: calc(100% - 100px);">
+
+    <!-- ⭐ Left side: CodeMirror editor -->
+    <div id="editor" style="width:50%; height:100%;"></div>
+
+    <!-- ⭐ Right side: Live preview -->
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+
+</div>
+
+<script>
+    let editor;
+    let currentMode = "html";
+
+    // Initialize CodeMirror for HTML mode
+    window.onload = function () {
+        editor = CodeMirror(document.getElementById("editor"), {
+            lineNumbers: true,
+            mode: "htmlmixed",
+            theme: "monokai"
+        });
+
+        currentMode = "html";
+
+        // ⭐ Live preview update
+        editor.on("change", updatePreview);
+    };
+
+    // ⭐ Update preview iframe
+    function updatePreview() {
+        const iframe = document.getElementById("preview");
+        const code = editor.getValue();
+        iframe.srcdoc = code;
+    }
+
+    // Switch between HTML / CSS / JS pages
+    function switchMode(mode) {
+        currentMode = mode;
+
+        if (mode === "html") window.location.href = "index.html";
+        if (mode === "css") window.location.href = "css.html";
+        if (mode === "js") window.location.href = "js.html";
+    }
+
+    // ⭐ SAVE AS — always asks for filename
+    function saveAs() {
+        const text = editor.getValue();
+
+        let filename = prompt("Save As:",
+            currentMode === "html" ? "index.html" :
+            currentMode === "css"  ? "style.css" :
+                                     "script.js"
+        );
+
+        if (!filename) return;
+
+        const blob = new Blob([text], { type: "text/plain" });
+        const link = document.createElement("a");
+
+        link.download = filename;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
+
+    // Open a file into the editor
+    function openFile() {
+        const input = document.createElement("input");
+        input.type = "file";
+
+        input.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                editor.setValue(event.target.result);
+                updatePreview(); // ⭐ Update preview after loading file
+            };
+
+            reader.readAsText(file);
+        };
+
+        input.click();
+    }
+
+    // ⭐ Embedded service worker registration
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js")
+            .then(() => console.log("Service Worker Registered"))
+            .catch(err => console.log("SW Error:", err));
+    }
+</script>
+
+</body>
+</html>
+
+</html>
