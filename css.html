@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - CSS</title>
+
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="switchMode('js')">JS</button>
+            <button class="navbtn" onclick="saveAsUniversal()">Save As</button>
+            <button class="navbtn" onclick="openUniversal()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 100px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+    let editor;
+    let currentFileHandle = null;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    window.onload = function () {
+        editor = CodeMirror(document.getElementById("editor"), {
+            lineNumbers: true,
+            mode: "css",
+            theme: "monokai"
+        });
+
+        editor.on("change", updatePreview);
+    };
+
+    function updatePreview() {
+        const css = editor.getValue();
+        const iframe = document.getElementById("preview");
+
+        iframe.srcdoc = `
+            <html>
+            <head>
+                <style>${css}</style>
+            </head>
+            <body>
+                <h2>CSS Preview</h2>
+                <p>This is your CSS applied live.</p>
+            </body>
+            </html>
+        `;
+    }
+
+    function switchMode(mode) {
+        const pages = {
+            html: "index.html",
+            css: "css.html",
+            js: "js.html"
+        };
+
+        window.location.assign(pages[mode]);
+        setTimeout(() => window.location.href = pages[mode], 50);
+    }
+
+    async function saveAsUniversal() {
+        const text = editor.getValue();
+        const filename = "style.css";
+
+        if (isSafari || !window.showSaveFilePicker) {
+            const blob = new Blob([text], { type: "text/css" });
+            const link = document.createElement("a");
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            alert("Saved! On iPad, find it in Files → Downloads.");
+            return;
+        }
+
+        try {
+            const options = {
+                suggestedName: filename,
+                types: [{
+                    description: "CSS Files",
+                    accept: { "text/css": [".css"] }
+                }]
+            };
+
+            currentFileHandle = await window.showSaveFilePicker(options);
+            const writable = await currentFileHandle.createWritable();
+            await writable.write(text);
+            await writable.close();
+
+            alert("Saved successfully!");
+        } catch (err) {
+            console.log("Save As failed:", err);
+        }
+    }
+
+    async function openUniversal() {
+        if (isSafari || !window.showOpenFilePicker) {
+            const input = document.createElement("input");
+            input.type = "file";
+
+            input.onchange = async e => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                editor.setValue(text);
+                updatePreview();
+            };
+
+            input.click();
+            return;
+        }
+
+        try {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: "CSS Files",
+                    accept: { "text/css": [".css"] }
+                }]
+            });
+
+            currentFileHandle = fileHandle;
+
+            const file = await fileHandle.getFile();
+            const text = await file.text();
+
+            editor.setValue(text);
+            updatePreview();
+        } catch (err) {
+            console.log("Open failed:", err);
+        }
+    }
+</script>
+
+</body>
+</html>
