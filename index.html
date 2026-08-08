@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - HTML</title>
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="saveAsUniversal()">Save As</button>
+            <button class="navbtn" onclick="openUniversal()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 100px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+    let editor;
+    let currentMode = "html";
+    let currentFileHandle = null;
+
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    window.onload = function () {
+        editor = CodeMirror(document.getElementById("editor"), {
+            lineNumbers: true,
+            mode: "htmlmixed",
+            theme: "monokai"
+        });
+
+        editor.on("change", updatePreview);
+    };
+
+    function updatePreview() {
+        document.getElementById("preview").srcdoc = editor.getValue();
+    }
+
+    /* ⭐ SAFARI-SAFE PAGE SWITCHING */
+    function switchMode(mode) {
+        if (mode === "html") {
+            window.location.assign("index.html");
+            setTimeout(() => window.location.href = "index.html", 50);
+            return;
+        }
+
+        if (mode === "css") {
+            window.location.assign("css.html");
+            setTimeout(() => window.location.href = "css.html", 50);
+            return;
+        }
+
+        if (mode === "js") {
+            window.location.assign("js.html");
+            setTimeout(() => window.location.href = "js.html", 50);
+            return;
+        }
+    }
+
+    /* ⭐ UNIVERSAL SAVE AS */
+    async function saveAsUniversal() {
+        const text = editor.getValue();
+        const filename =
+            currentMode === "html" ? "index.html" :
+            currentMode === "css"  ? "style.css" :
+                                     "script.js";
+
+        if (isSafari || !window.showSaveFilePicker) {
+            const blob = new Blob([text], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            alert("Saved! On iPad, find it in Files → Downloads.");
+            return;
+        }
+
+        try {
+            const options = {
+                suggestedName: filename,
+                types: [{
+                    description: "Text Files",
+                    accept: { "text/plain": [".html", ".css", ".js"] }
+                }]
+            };
+
+            currentFileHandle = await window.showSaveFilePicker(options);
+            const writable = await currentFileHandle.createWritable();
+            await writable.write(text);
+            await writable.close();
+
+            alert("Saved successfully!");
+        } catch (err) {
+            console.log("Save As failed:", err);
+        }
+    }
+
+    /* ⭐ UNIVERSAL OPEN */
+    async function openUniversal() {
+        if (isSafari || !window.showOpenFilePicker) {
+            const input = document.createElement("input");
+            input.type = "file";
+
+            input.onchange = async e => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                editor.setValue(text);
+                updatePreview();
+            };
+
+            input.click();
+            return;
+        }
+
+        try {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: "Text Files",
+                    accept: { "text/plain": [".html", ".css", ".js"] }
+                }]
+            });
+
+            currentFileHandle = fileHandle;
+
+            const file = await fileHandle.getFile();
+            const text = await file.text();
+
+            editor.setValue(text);
+            updatePreview();
+        } catch (err) {
+            console.log("Open failed:", err);
+        }
+    }
+
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js")
+            .then(() => console.log("Service Worker Registered"))
+            .catch(err => console.log("SW Error:", err));
+    }
+</script>
+
+</body>
+</html>
