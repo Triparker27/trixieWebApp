@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - HTML</title>
+
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="switchMode('js')">JS</button>
+            <button class="navbtn" onclick="saveAsUniversal()">Save As</button>
+            <button class="navbtn" onclick="openUniversal()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 100px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+    const PROJECT = "trixieProject";
+    let editor;
+    let currentFileHandle = null;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    /* ------------------ AUTOSAVE + AUTOLOAD ------------------ */
+
+    function saveToLocal() {
+        localStorage.setItem(PROJECT + "_html", editor.getValue());
+    }
+
+    function loadFromLocal() {
+        return localStorage.getItem(PROJECT + "_html") || "";
+    }
+
+    /* ------------------ INIT EDITOR ------------------ */
+
+    window.onload = function () {
+        editor = CodeMirror(document.getElementById("editor"), {
+            lineNumbers: true,
+            mode: "htmlmixed",
+            theme: "monokai"
+        });
+
+        editor.setValue(loadFromLocal());
+        updatePreview();
+
+        editor.on("change", () => {
+            saveToLocal();
+            updatePreview();
+        });
+    };
+
+    /* ------------------ FULL PROJECT PREVIEW ------------------ */
+
+    function updatePreview() {
+        const html = editor.getValue();
+        const css = localStorage.getItem(PROJECT + "_css") || "";
+        const js = localStorage.getItem(PROJECT + "_js") || "";
+
+        const iframe = document.getElementById("preview");
+
+        iframe.srcdoc = `
+            <html>
+            <head>
+                <style>${css}</style>
+            </head>
+            <body>
+                ${html}
+                <script>${js}<\/script>
+            </body>
+            </html>
+        `;
+    }
+
+    /* ------------------ TAB SWITCHING ------------------ */
+
+    function switchMode(mode) {
+        const pages = {
+            html: "index.html",
+            css: "css.html",
+            js: "js.html"
+        };
+
+        window.location.assign(pages[mode]);
+        setTimeout(() => window.location.href = pages[mode], 50);
+    }
+
+    /* ------------------ UNIVERSAL SAVE AS (WINDOWS + IPAD) ------------------ */
+
+    async function saveAsUniversal() {
+        const bundle = {
+            html: localStorage.getItem(PROJECT + "_html") || "",
+            css: localStorage.getItem(PROJECT + "_css") || "",
+            js: localStorage.getItem(PROJECT + "_js") || ""
+        };
+
+        const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+            type: "application/json"
+        });
+
+        const filename = "trixie-project.json";
+
+        if (isSafari || !window.showSaveFilePicker) {
+            const link = document.createElement("a");
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            alert("Saved! On iPad, find it in Files → Downloads.");
+            return;
+        }
+
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: "Trixie Project",
+                    accept: { "application/json": [".json"] }
+                }]
+            });
+
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+
+            alert("Project saved successfully!");
+        } catch (err) {
+            console.log("Save As failed:", err);
+        }
+    }
+
+    /* ------------------ UNIVERSAL OPEN (WINDOWS + IPAD) ------------------ */
+
+    async function openUniversal() {
+        if (isSafari || !window.showOpenFilePicker) {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".json";
+
+            input.onchange = async e => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                loadBundle(JSON.parse(text));
+            };
+
+            input.click();
+            return;
+        }
+
+        try {
+            const [handle] = await window.showOpenFilePicker({
+                types: [{
+                    description: "Trixie Project",
+                    accept: { "application/json": [".json"] }
+                }]
+            });
+
+            const file = await handle.getFile();
+            const text = await file.text();
+            loadBundle(JSON.parse(text));
+        } catch (err) {
+            console.log("Open failed:", err);
+        }
+    }
+
+    /* ------------------ LOAD BUNDLE ------------------ */
+
+    function loadBundle(bundle) {
+        localStorage.setItem(PROJECT + "_html", bundle.html);
+        localStorage.setItem(PROJECT + "_css", bundle.css);
+        localStorage.setItem(PROJECT + "_js", bundle.js);
+
+        editor.setValue(bundle.html);
+        updatePreview();
+
+        alert("Project loaded!");
+    }
+
+</script>
+
+</body>
+</html>
