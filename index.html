@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - HTML</title>
+
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+
+    <!-- Syntax Highlighting Modes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons" id="nav-left">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="switchMode('js')">JS</button>
+            <button class="navbtn" onclick="saveAsHTML()">Save As</button>
+            <button class="navbtn" onclick="openHTML()">Open</button>
+        </div>
+
+        <div class="nav-buttons" id="nav-right">
+            <button class="navbtn" onclick="insertNavbar()">Insert Navbar</button>
+            <button class="navbtn" onclick="insertRow()">Insert Row</button>
+        </div>
+    </div>
+</nav>
+
+<nav class="navbar" style="background:#222; border-bottom:2px solid #333;">
+    <div class="nav-container" id="fileTabBar" style="justify-content:flex-start;">
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 160px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+function safeGet(key, fallback) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function safeSet(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+}
+
+let tabs = safeGet("trixieTabs", [
+    { name: "index.html", type: "html", content: "" }
+]);
+
+let activeTab = safeGet("trixieActiveTab", 0);
+
+function saveTabs() {
+    safeSet("trixieTabs", tabs);
+    safeSet("trixieActiveTab", activeTab);
+}
+
+function closeTab(i) {
+    tabs.splice(i, 1);
+
+    if (tabs.length === 0) {
+        tabs.push({ name: "index.html", type: "html", content: "" });
+        activeTab = 0;
+    } else if (i === activeTab) {
+        activeTab = Math.max(0, i - 1);
+    }
+
+    saveTabs();
+    renderTabs();
+    editor.setValue(tabs[activeTab].content);
+    updatePreview();
+}
+
+function renderTabs() {
+    const bar = document.getElementById("fileTabBar");
+    bar.innerHTML = "";
+
+    tabs.forEach((tab, i) => {
+        const wrap = document.createElement("div");
+        wrap.style.display = "flex";
+        wrap.style.alignItems = "center";
+
+        const btn = document.createElement("button");
+        btn.className = "navbtn";
+        btn.textContent = tab.name;
+
+        if (i === activeTab) btn.style.background = "#555";
+
+        btn.onclick = () => switchTab(i);
+
+        const close = document.createElement("div");
+        close.className = "tab-close";
+        close.textContent = "×";
+
+        close.onclick = (e) => {
+            e.stopPropagation();
+            closeTab(i);
+        };
+
+        wrap.appendChild(btn);
+        wrap.appendChild(close);
+        bar.appendChild(wrap);
+    });
+}
+
+function switchTab(i) {
+    saveTab();
+    activeTab = i;
+    editor.setValue(tabs[i].content);
+    updatePreview();
+    renderTabs();
+    saveTabs();
+}
+
+function saveTab() {
+    tabs[activeTab].content = editor.getValue();
+    saveTabs();
+}
+
+function insertNavbar() {
+    const snippet = `
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn">HTML</button>
+            <button class="navbtn">CSS</button>
+            <button class="navbtn">JS</button>
+            <button class="navbtn">Save As</button>
+            <button class="navbtn">Open</button>
+        </div>
+    </div>
+</nav>
+`;
+    editor.replaceRange(snippet, editor.getCursor());
+    saveTab();
+    updatePreview();
+}
+
+function insertRow() {
+    const snippet = `
+<div class="row">
+    <div class="col col-6">
+        <div class="box">Column 1</div>
+    </div>
+    <div class="col col-6">
+        <div class="box">Column 2</div>
+    </div>
+</div>
+`;
+    editor.replaceRange(snippet, editor.getCursor());
+    saveTab();
+    updatePreview();
+}
+
+const PROJECT = "trixieProject";
+let editor;
+let currentFileHandle = null;
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+window.onload = function () {
+    editor = CodeMirror(document.getElementById("editor"), {
+        lineNumbers: true,
+        mode: "htmlmixed",
+        theme: "monokai",
+        lineWrapping: true
+    });
+
+    renderTabs();
+    editor.setValue(tabs[activeTab].content);
+    updatePreview();
+
+    editor.on("change", () => {
+        saveTab();
+        updatePreview();
+    });
+};
+
+function updatePreview() {
+    const html = tabs[activeTab].content;
+    const css = localStorage.getItem(PROJECT + "_css") || "";
+    const js = localStorage.getItem(PROJECT + "_js") || "";
+
+    const iframe = document.getElementById("preview");
+
+    iframe.srcdoc = `
+        <html>
+        <head><style>${css}</style></head>
+        <body>
+            ${html}
+            <script>${js}<\/script>
+        </body>
+        </html>
+    `;
+}
+
+function switchMode(mode) {
+    saveTab();
+    saveTabs();
+
+    const pages = {
+        html: "index.html",
+        css: "css.html",
+        js: "js.html"
+    };
+
+    window.location.assign(pages[mode]);
+}
+
+async function saveAsHTML() {
+    const html = editor.getValue();
+    const filename = tabs[activeTab].name;
+
+    if (isSafari || !window.showSaveFilePicker) {
+        const blob = new Blob([html], { type: "text/html" });
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        alert("Saved! On iPad, check Files → Downloads.");
+        return;
+    }
+
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: "HTML Files", accept: { "text/html": [".html"] } }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(html);
+        await writable.close();
+
+        alert("Saved successfully!");
+    } catch (err) {
+        console.log("Save As failed:", err);
+    }
+}
+
+async function openHTML() {
+    saveTab();
+    saveTabs();
+
+    if (isSafari || !window.showOpenFilePicker) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".html";
+
+        input.onchange = async e => {
+            const file = e.target.files[0];
+            const text = await file.text();
+
+            tabs.push({ name: file.name, type: "html", content: text });
+
+            activeTab = tabs.length - 1;
+            saveTabs();
+            renderTabs();
+            editor.setValue(text);
+            updatePreview();
+        };
+
+        input.click();
+        return;
+    }
+
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            types: [{ description: "HTML Files", accept: { "text/html": [".html"] } }]
+        });
+
+        const file = await handle.getFile();
+        const text = await file.text();
+
+        tabs.push({ name: file.name, type: "html", content: text });
+
+        activeTab = tabs.length - 1;
+        saveTabs();
+        renderTabs();
+        editor.setValue(text);
+        updatePreview();
+    } catch (err) {
+        console.log("Open failed:", err);
+    }
+}
+
+</script>
+
+</body>
+</html>
