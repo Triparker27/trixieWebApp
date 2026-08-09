@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - CSS</title>
+
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="switchMode('js')">JS</button>
+            <button class="navbtn" onclick="saveCSS()">Save As</button>
+            <button class="navbtn" onclick="openCSS()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<!-- MULTI‑TAB BAR (same as HTML tab system) -->
+<nav class="navbar" style="background:#222; border-bottom:2px solid #333;">
+    <div class="nav-container" id="fileTabBar" style="justify-content:flex-start;">
+        <!-- Tabs auto-render here -->
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 160px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+/* ------------------ iPad‑SAFE LOCALSTORAGE WRAPPER ------------------ */
+
+function safeGet(key, fallback) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+function safeSet(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        console.log("localStorage failed:", e);
+    }
+}
+
+/* ------------------ SHARED TAB SYSTEM ------------------ */
+
+let tabs = safeGet("trixieTabs", [
+    { name: "index.html", type: "html", content: "" }
+]);
+
+let activeTab = safeGet("trixieActiveTab", 0);
+
+function saveTabs() {
+    safeSet("trixieTabs", tabs);
+    safeSet("trixieActiveTab", activeTab);
+}
+
+function renderTabs() {
+    const bar = document.getElementById("fileTabBar");
+    bar.innerHTML = "";
+
+    tabs.forEach((tab, i) => {
+        const btn = document.createElement("button");
+        btn.className = "navbtn";
+        btn.textContent = tab.name;
+
+        if (i === activeTab) {
+            btn.style.background = "#555";
+        }
+
+        btn.onclick = () => switchTab(i);
+        bar.appendChild(btn);
+    });
+}
+
+function switchTab(i) {
+    activeTab = i;
+    saveTabs();
+    updatePreview();
+    renderTabs();
+}
+
+/* ------------------ CSS EDITOR LOGIC ------------------ */
+
+const PROJECT = "trixieProject";
+let editor;
+let currentFileHandle = null;
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+function saveCSSLocal() {
+    localStorage.setItem(PROJECT + "_css", editor.getValue());
+    updatePreview();
+}
+
+function loadCSSLocal() {
+    return localStorage.getItem(PROJECT + "_css") || "";
+}
+
+/* ------------------ INIT EDITOR ------------------ */
+
+window.onload = function () {
+    editor = CodeMirror(document.getElementById("editor"), {
+        lineNumbers: true,
+        mode: "css",
+        theme: "monokai",
+        lineWrapping: true
+    });
+
+    renderTabs();
+
+    editor.setValue(loadCSSLocal());
+    updatePreview();
+
+    editor.on("change", saveCSSLocal);
+};
+
+/* ------------------ PREVIEW ------------------ */
+
+function updatePreview() {
+    const html = tabs[activeTab].content;
+    const css = editor.getValue();
+    const js = localStorage.getItem(PROJECT + "_js") || "";
+
+    const iframe = document.getElementById("preview");
+
+    iframe.srcdoc = `
+        <html>
+        <head>
+            <style>${css}</style>
+        </head>
+        <body>
+            ${html}
+            <script>${js}<\/script>
+        </body>
+        </html>
+    `;
+}
+
+/* ------------------ TAB SWITCHING ------------------ */
+
+function switchMode(mode) {
+    saveCSSLocal();
+    saveTabs();
+
+    const pages = {
+        html: "index.html",
+        css: "css.html",
+        js: "js.html"
+    };
+
+    window.location.assign(pages[mode]);
+}
+
+/* ------------------ SAVE CSS ------------------ */
+
+async function saveCSS() {
+    const css = editor.getValue();
+    const filename = "style.css";
+
+    if (isSafari || !window.showSaveFilePicker) {
+        const blob = new Blob([css], { type: "text/css" });
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        alert("Saved! On iPad, check Files → Downloads.");
+        return;
+    }
+
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+                description: "CSS Files",
+                accept: { "text/css": [".css"] }
+            }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(css);
+        await writable.close();
+
+        alert("Saved successfully!");
+    } catch (err) {
+        console.log("Save failed:", err);
+    }
+}
+
+/* ------------------ OPEN CSS ------------------ */
+
+async function openCSS() {
+    if (isSafari || !window.showOpenFilePicker) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".css";
+
+        input.onchange = async e => {
+            const file = e.target.files[0];
+            const text = await file.text();
+            editor.setValue(text);
+            saveCSSLocal();
+        };
+
+        input.click();
+        return;
+    }
+
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            types: [{
+                description: "CSS Files",
+                accept: { "text/css": [".css"] }
+            }]
+        });
+
+        const file = await handle.getFile();
+        const text = await file.text();
+
+        editor.setValue(text);
+        saveCSSLocal();
+    } catch (err) {
+        console.log("Open failed:", err);
+    }
+}
+
+</script>
+
+</body>
+</html>
