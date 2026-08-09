@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trixie Web - HTML</title>
+
+    <link rel="stylesheet" href="trixiecss.css">
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+</head>
+
+<body>
+
+<div class="logo">Trixie</div>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="nav-buttons">
+            <button class="navbtn" onclick="switchMode('html')">HTML</button>
+            <button class="navbtn" onclick="switchMode('css')">CSS</button>
+            <button class="navbtn" onclick="switchMode('js')">JS</button>
+            <button class="navbtn" onclick="saveAsHTML()">Save As</button>
+            <button class="navbtn" onclick="openHTML()">Open</button>
+        </div>
+    </div>
+</nav>
+
+<div id="split-container" style="display:flex; height: calc(100% - 100px);">
+    <div id="editor" style="width:50%; height:100%;"></div>
+    <iframe id="preview" style="width:50%; height:100%; background:white; border:none;"></iframe>
+</div>
+
+<script>
+    const PROJECT = "trixieProject";
+    let editor;
+    let currentFileHandle = null;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    /* ------------------ AUTOSAVE + AUTOLOAD ------------------ */
+
+    function saveToLocal() {
+        localStorage.setItem(PROJECT + "_html", editor.getValue());
+    }
+
+    function loadFromLocal() {
+        return localStorage.getItem(PROJECT + "_html") || "";
+    }
+
+    /* ------------------ INIT EDITOR ------------------ */
+
+    window.onload = function () {
+        editor = CodeMirror(document.getElementById("editor"), {
+            lineNumbers: true,
+            mode: "htmlmixed",
+            theme: "monokai"
+        });
+
+        editor.setValue(loadFromLocal());
+        updatePreview();
+
+        editor.on("change", () => {
+            saveToLocal();
+            updatePreview();
+        });
+    };
+
+    /* ------------------ FULL PROJECT PREVIEW ------------------ */
+
+    function updatePreview() {
+        const html = editor.getValue();
+        const css = localStorage.getItem(PROJECT + "_css") || "";
+        const js = localStorage.getItem(PROJECT + "_js") || "";
+
+        const iframe = document.getElementById("preview");
+
+        iframe.srcdoc = `
+            <html>
+            <head>
+                <style>${css}</style>
+            </head>
+            <body>
+                ${html}
+                <script>${js}<\/script>
+            </body>
+            </html>
+        `;
+    }
+
+    /* ------------------ TAB SWITCHING ------------------ */
+
+    function switchMode(mode) {
+        const pages = {
+            html: "index.html",
+            css: "css.html",
+            js: "js.html"
+        };
+
+        window.location.assign(pages[mode]);
+        setTimeout(() => window.location.href = pages[mode], 50);
+    }
+
+    /* ------------------ FILENAME FROM <title> ------------------ */
+
+    function extractTitle(html) {
+        const match = html.match(/<title>(.*?)<\/title>/i);
+        return match ? match[1].trim() : "index";
+    }
+
+    /* ------------------ SAVE AS REAL HTML ------------------ */
+
+    async function saveAsHTML() {
+        const html = editor.getValue();
+        const filename = extractTitle(html) + ".html";
+
+        // Safari / iPad fallback
+        if (isSafari || !window.showSaveFilePicker) {
+            const blob = new Blob([html], { type: "text/html" });
+            const link = document.createElement("a");
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            alert("Saved! On iPad, check Files → Downloads.");
+            return;
+        }
+
+        // Windows / Chrome / Edge
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: "HTML Files",
+                    accept: { "text/html": [".html"] }
+                }]
+            });
+
+            const writable = await handle.createWritable();
+            await writable.write(html);
+            await writable.close();
+
+            alert("Saved successfully!");
+        } catch (err) {
+            console.log("Save As failed:", err);
+        }
+    }
+
+    /* ------------------ OPEN REAL HTML ------------------ */
+
+    async function openHTML() {
+        // Safari fallback
+        if (isSafari || !window.showOpenFilePicker) {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".html";
+
+            input.onchange = async e => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                editor.setValue(text);
+                saveToLocal();
+                updatePreview();
+            };
+
+            input.click();
+            return;
+        }
+
+        // Windows / Chrome / Edge
+        try {
+            const [handle] = await window.showOpenFilePicker({
+                types: [{
+                    description: "HTML Files",
+                    accept: { "text/html": [".html"] }
+                }]
+            });
+
+            const file = await handle.getFile();
+            const text = await file.text();
+
+            editor.setValue(text);
+            saveToLocal();
+            updatePreview();
+        } catch (err) {
+            console.log("Open failed:", err);
+        }
+    }
+
+</script>
+
+</body>
+</html>
